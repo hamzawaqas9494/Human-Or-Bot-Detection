@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Human OR Bot Tracker</title>
+  <style>
+    body {
+      font-family: 'Arial', sans-serif;
+      background-color: #f9f9f9;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+    }
+
+    h1 {
+      color: #333;
+    }
+
+    .tracker-container {
+    gap: 10px;
+    width: 1280px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 20;
+}
+
+img {
+    width: 250px;
+    height: 200px;
+    border: 4px solid #4caf50;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: transform 0.2s ease-in-out;
+}
+    img:hover {
+      transform: scale(1.05);
+    }
+
+    .info-box {
+      border: 4px solid #4caf50;
+    box-sizing: border-box;
+    padding: 10px;
+    border-radius: 8px;
+    background-color: #fff;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    width: 250px;
+}
+    .info-box p {
+      margin: 10px 0;
+      font-size: 18px;
+      color: #555;
+    }
+
+    .highlight {
+      color: #4caf50;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <h1>Human OR Bot Tracker</h1>
+  <div class="tracker-container">
+    <img id="target-image-1" data-ad-id="ad1" src="https://www.w3schools.com/w3images/flowers.jpg" alt="Trackable Image" />
+<img id="target-image-2" data-ad-id="ad2" src="https://www.w3schools.com/w3images/fjords.jpg" alt="Trackable Image" />
+<img id="target-image-3" data-ad-id="ad3" src="https://www.w3schools.com/w3images/snow.jpg" alt="Trackable Image" />
+<img id="target-image-4" data-ad-id="ad4" src="https://www.w3schools.com/w3images/underwater.jpg" alt="Trackable Image" />
+
+
+
+    <div class="info-box">
+      <p>Ad ID: <span class="highlight" id="adId">Loading...</span></p>
+      <p>User Status: <span class="highlight" id="userStatus">Loading...</span></p>
+      <p>User IP: <span class="highlight" id="userIP">Loading...</span></p>
+      <p>Country: <span class="highlight" id="Country">Loading...</span></p>
+    </div>
+  </div>
+
+  <script>
+    // Initialize central data object to track each ad's interaction data separately
+    let interactionData = {};
+
+    // Session start time
+    const sessionStartTime = Date.now();
+
+    // Variables for mouse movement tracking
+    let lastX = null;
+    let lastY = null;
+    let lastMoveTime = Date.now();
+
+    // Get DOM elements
+    const adIdEl = document.getElementById("adId");
+    const userStatusEl = document.getElementById("userStatus");
+    const userIPEl = document.getElementById("userIP");
+    const CountryEl = document.getElementById("Country");
+
+    // Function to update UI
+    const updateUI = (adId) => {
+      const data = interactionData[adId] || {};
+      adIdEl.textContent = adId || "Loading...";
+    };
+
+    // Function to send data to the backend
+    const sendDataToBackend = async (adId) => {
+      try {
+        const data = interactionData[adId];
+        if (data) {
+          const response = await fetch("/api/track-interaction", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify([data]),
+          });
+          const result = await response.json();
+
+          // Display user status and IP address
+          userStatusEl.textContent = result.isHuman ? 'Human' : 'Bot';
+          userIPEl.textContent = result.info.ip;
+          CountryEl.textContent = result.info.country;
+
+        }
+      } catch (error) {
+        console.error("Error sending data:", error);
+      }
+    };
+
+    // Handle mouse movement on image
+    const handleMouseMove = (event, adId) => {
+      if (!interactionData[adId]) {
+        interactionData[adId] = {
+          adId,
+          mouseMovesCount: 0,
+          direction: 'None',
+          clickCount: 0,
+          clicks: [],
+          userAgent: navigator.userAgent,
+          sessionDuration: 0,
+          mouseSpeed: 0,
+          scrollDepth: 0,
+        };
+      }
+
+      const data = interactionData[adId];
+
+      data.mouseMovesCount++;
+
+      // Calculate direction
+      if (lastX !== null && lastY !== null) {
+        const diffX = event.clientX - lastX;
+        const diffY = event.clientY - lastY;
+        data.direction = Math.abs(diffX) > Math.abs(diffY)
+          ? (diffX > 0 ? "Right" : "Left")
+          : (diffY > 0 ? "Down" : "Up");
+      }
+
+      // Update last mouse position
+      const currentTime = Date.now();
+      const distance = Math.sqrt(Math.pow(event.clientX - lastX || 0, 2) + Math.pow(event.clientY - lastY || 0, 2));
+      const timeDifference = currentTime - lastMoveTime;
+      data.mouseSpeed = distance / (timeDifference || 1);
+
+      lastX = event.clientX;
+      lastY = event.clientY;
+      lastMoveTime = currentTime;
+
+      // Update session duration
+      data.sessionDuration = Date.now() - sessionStartTime;
+
+      // Update UI
+      updateUI(adId);
+
+      // Send data to backend
+      sendDataToBackend(adId);
+    };
+
+    // Handle click on image
+    const handleClick = (event, adId) => {
+      if (!interactionData[adId]) {
+        interactionData[adId] = {
+          adId,
+          mouseMovesCount: 0,
+          direction: 'None',
+          clickCount: 0,
+          clicks: [],
+          userAgent: navigator.userAgent,
+          sessionDuration: 0,
+          mouseSpeed: 0,
+          scrollDepth: 0,
+        };
+      }
+
+      const data = interactionData[adId];
+
+      data.clickCount++;
+      data.clicks.push({
+        timestamp: new Date().toISOString(),
+        x: event.clientX,
+        y: event.clientY,
+      });
+
+      // Update scroll depth
+      data.scrollDepth = Math.max(data.scrollDepth, window.scrollY);
+
+      // Update session duration
+      data.sessionDuration = Date.now() - sessionStartTime;
+
+      // Update UI
+      updateUI(adId);
+
+      // Send data to backend
+      sendDataToBackend(adId);
+    };
+
+    // Attach event listeners to each image
+    document.querySelectorAll("img").forEach(image => {
+      const adId = image.dataset.adId;
+
+      image.addEventListener("mousemove", (event) => handleMouseMove(event, adId));
+      image.addEventListener("click", (event) => handleClick(event, adId));
+    });
+  </script>
+</body>
+</html>
+
